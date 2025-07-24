@@ -1,0 +1,19 @@
+# Ignore virtual environment
+venv/
+
+# Ignore environment variables file
+.env
+
+# Ignore SQLite database
+db.sqlite3
+
+# Ignore Python cache
+__pycache__/
+*.py[cod]
+
+# Ignore VSCode settings (optional)
+.vscode/
+
+# Ignore system files (optional)
+.DS_Store
+Thumbs.db
