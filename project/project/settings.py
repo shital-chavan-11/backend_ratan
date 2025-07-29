@@ -64,6 +64,13 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vite dev server
     "http://127.0.0.1:5173"
 ]
+ALLOWED_HOSTS = [
+    "ratanjyoti.onrender.com",     # backend domain
+    "ratanjyoti.in",               # custom domain (your frontend domain)
+    "ratanjyoti-1.onrender.com",   # frontend's render domain (optional, but safe)
+    "localhost",                   # local testing
+    "127.0.0.1",                   # local testing
+]
 
 TEMPLATES = [
     {
