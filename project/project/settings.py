@@ -67,6 +67,7 @@ CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = [
     "https://ratanjyoti-1.onrender.com",
     "http://localhost:5173",
+    "https://ratanjyoti.in",
 ]
 
 TEMPLATES = [
