@@ -91,10 +91,14 @@ WSGI_APPLICATION = 'project.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
  
+from pathlib import Path
 import os
 from dotenv import load_dotenv
 
-load_dotenv(dotenv_path=os.getenv("ENV_PATH", ".env"))
+# Load .env from /etc/secrets/.env or fallback to local
+dotenv_path = os.environ.get("ENV_PATH", BASE_DIR / ".env")
+load_dotenv(dotenv_path=dotenv_path)
+
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 DEBUG = os.getenv("DEBUG") == "True"
