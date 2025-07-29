@@ -57,14 +57,13 @@ MIDDLEWARE = [
 ]
 CORS_ALLOW_CREDENTIALS = True
 ROOT_URLCONF = 'project.urls'
-ALLOWED_HOSTS = [
-    "ratanjyoti.onrender.com",
-    "ratanjyoti-1.onrender.com",
-    "ratanjyoti.in",
-    "localhost",
-    "127.0.0.1"
+CORS_ALLOWED_ORIGINS = [
+    "https://ratanjyoti.in",
+    "https://ratanjyoti-1.onrender.com",
+    "https://ratanjyoti.onrender.com",
+    "http://localhost:5173",  # Vite dev server
+    "http://127.0.0.1:5173"
 ]
-
 
 TEMPLATES = [
     {
