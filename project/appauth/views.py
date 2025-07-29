@@ -12,21 +12,32 @@ from rest_framework_simplejwt.tokens import RefreshToken
 def generate_otp():
     return str(random.randint(100000,999999))
 class SignAPIView(APIView):
-    def post(self,request):
+    def post(self, request):
         try:
-            data=request.data
-            first_name=data.get('first_name','').strip()
-            last_name=data.get('last_name','').strip()
-            birth_date=data.get('birth_date')
-            mobile = data.get('mobile')   
-            email = data.get('email')  
-            password=data.get('password')
-            confirm_password=data.get('confirm_password')
-            if not all([first_name,last_name,birth_date,mobile,email,password,confirm_password]):
-                return Response({'error':'All fields are required'},status=400)
-            if password!=confirm_password:
-                return Response({'error':'passwords are not match'},status=400)
-            user=CustomUser.objects.create_user(
+            data = request.data
+            required_fields = ['first_name', 'last_name', 'birth_date', 'mobile', 'email', 'password', 'confirm_password']
+            missing_fields = [field for field in required_fields if not data.get(field)]
+
+            if missing_fields:
+                return Response({'error': f"Missing fields: {', '.join(missing_fields)}"}, status=400)
+
+            first_name = data['first_name'].strip()
+            last_name = data['last_name'].strip()
+            birth_date = data['birth_date']
+            mobile = data['mobile']
+            email = data['email']
+            password = data['password']
+            confirm_password = data['confirm_password']
+
+            if password != confirm_password:
+                return Response({'error': 'Passwords do not match'}, status=400)
+
+            # Check if email already exists
+            if CustomUser.objects.filter(email=email).exists():
+                return Response({'error': 'User with this email already exists'}, status=400)
+
+            # Create user
+            user = CustomUser.objects.create_user(
                 first_name=first_name,
                 last_name=last_name,
                 birth_date=birth_date,
@@ -35,20 +46,27 @@ class SignAPIView(APIView):
                 is_active=False,
                 password=password
             )
-            otp=generate_otp()
-            OTPRecord.objects.create(user=user,otp=otp)
+
+            # Generate and save OTP
+            otp = generate_otp()
+            OTPRecord.objects.create(user=user, otp=otp)
+
+            # Send OTP to email
             send_mail(
                 subject="Verify Your Email - OTP Inside",
-                message=f"Your OTP is {otp}. It is vaild for 10 minutes",
+                message=f"Your OTP is {otp}. It is valid for 10 minutes.",
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[email],
+                fail_silently=False,
             )
-            request.session['user_email']=email
-            request.session.modified=True
-            return Response({'message':'User ragistred.OTP send to email'})
+
+            request.session['user_email'] = email
+            request.session.modified = True
+
+            return Response({'message': 'User registered. OTP sent to email'}, status=201)
+
         except Exception as e:
-            return Response({'error':f'server error:{str(e)}'},status=500)
- 
+            return Response({'error': f'Server error: {str(e)}'}, status=500)
 
 @method_decorator(csrf_exempt, name='dispatch')
 class OTPVerificationAPIview(APIView):
