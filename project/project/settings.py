@@ -94,7 +94,7 @@ WSGI_APPLICATION = 'project.wsgi.application'
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(dotenv_path=os.getenv("ENV_PATH", ".env"))
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 DEBUG = os.getenv("DEBUG") == "True"
