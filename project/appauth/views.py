@@ -149,23 +149,24 @@ class SigninAPIView(APIView):
         cookie_domain = '.ratanjyoti.in'  # 👈️ Add this
 
         response.set_cookie(
-        key='access',
-        value=access_token,
-        httponly=True,
-        secure=cookie_secure,
-        samesite='Lax',
-        max_age=300,
-        domain=cookie_domain   # 👈️ NEW
-        )
+    key='access',
+    value=access_token,
+    httponly=True,
+    secure=True,  # must be True in production
+    samesite='None',  # ✅ Crucial for cross-domain
+    max_age=300,
+    domain='.ratanjyoti.in',  # ✅ works for api.ratanjyoti.in & ratanjyoti.in
+)
+
         response.set_cookie(
         key='refresh',
         value=str(refresh),
         httponly=True,
-        secure=cookie_secure,
-        samesite='Lax',
+        secure=True,
+        samesite='None',  # ✅ same as above
         max_age=7 * 24 * 60 * 60,
-        domain=cookie_domain   # 👈️ NEW
-        )
+        domain='.ratanjyoti.in',
+)
 
         return response
 
