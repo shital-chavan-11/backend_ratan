@@ -184,32 +184,32 @@ class LogoutAPIView(APIView):
             return Response({"error":"Invalid or Expired token"},status=status.HTTP_400_BAD_REQUEST)
 class RefreshTokenAPIView(APIView):
     def post(self, request):
-        refresh_token = request.data.get('refresh_token')
+        # ✅ Get refresh token from cookie
+        refresh_token = request.COOKIES.get('refresh')
 
         if not refresh_token:
-            return Response({"error": "Refresh Token must be provided"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "No refresh token found in cookies"}, status=status.HTTP_401_UNAUTHORIZED)
 
         try:
             refresh = RefreshToken(refresh_token)
             access_token = str(refresh.access_token)
 
-            # Create a response object
+            # ✅ Create a new response with access token as HttpOnly cookie
             response = Response({"message": "Access token refreshed"}, status=status.HTTP_200_OK)
-
-            # Set new access token as HttpOnly cookie
             response.set_cookie(
                 key='access',
                 value=access_token,
                 httponly=True,
-                secure=True,       # True in production (HTTPS)
+                secure=True,
                 samesite='Lax',
-                max_age=300         # 5 minutes
+                max_age=300  # 5 minutes
             )
 
             return response
 
         except TokenError:
-            return Response({"error": "Invalid or Expired Token"}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"error": "Invalid or expired token"}, status=status.HTTP_401_UNAUTHORIZED)
+
 class ForgetPasswordAPIView(APIView):
     def post(self,request):
         email=request.data.get('email')
