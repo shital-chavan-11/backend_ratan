@@ -168,6 +168,12 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 
 USE_TZ = True
+CSRF_TRUSTED_ORIGINS = [
+    "https://ratanjyoti.in",  # ✅ trusted for POST/secure requests
+]
+
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 
 
 # Static files (CSS, JavaScript, Images)

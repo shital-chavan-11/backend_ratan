@@ -146,21 +146,25 @@ class SigninAPIView(APIView):
         # Set HttpOnly cookies
         cookie_secure = not settings.DEBUG  # Automatically True in production, False during local dev
 
+        cookie_domain = '.ratanjyoti.in'  # 👈️ Add this
+
         response.set_cookie(
-            key='access',
-            value=access_token,
-            httponly=True,
-            secure=cookie_secure,
-            samesite='Lax',
-            max_age=300  # 5 minutes
+        key='access',
+        value=access_token,
+        httponly=True,
+        secure=cookie_secure,
+        samesite='Lax',
+        max_age=300,
+        domain=cookie_domain   # 👈️ NEW
         )
         response.set_cookie(
-            key='refresh',
-            value=str(refresh),
-            httponly=True,
-            secure=cookie_secure,
-            samesite='Lax',
-            max_age=7 * 24 * 60 * 60  # 7 days
+        key='refresh',
+        value=str(refresh),
+        httponly=True,
+        secure=cookie_secure,
+        samesite='Lax',
+        max_age=7 * 24 * 60 * 60,
+        domain=cookie_domain   # 👈️ NEW
         )
 
         return response
