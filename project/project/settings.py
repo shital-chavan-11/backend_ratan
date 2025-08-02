@@ -62,14 +62,16 @@ CORS_ALLOWED_ORIGINS = [
     "https://ratanjyoti-1.onrender.com",
     "https://ratanjyoti.onrender.com",
     "http://localhost:5173",  # Vite dev server
-    "http://127.0.0.1:5173"
+    "http://127.0.0.1:5173",
+    "api.ratanjyoti.in",
 ]
 ALLOWED_HOSTS = [
     "ratanjyoti.onrender.com",     # backend domain
     "ratanjyoti.in",               # custom domain (your frontend domain)
     "ratanjyoti-1.onrender.com",   # frontend's render domain (optional, but safe)
     "localhost",                   # local testing
-    "127.0.0.1",                   # local testing
+    "127.0.0.1",  
+    "api.ratanjyoti.in",                 # local testing
 ]
 
 TEMPLATES = [
@@ -169,7 +171,8 @@ USE_I18N = True
 
 USE_TZ = True
 CSRF_TRUSTED_ORIGINS = [
-    "https://ratanjyoti.in",  # ✅ trusted for POST/secure requests
+    "https://ratanjyoti.in",
+    "api.ratanjyoti.in",  # ✅ trusted for POST/secure requests
 ]
 
 SESSION_COOKIE_SECURE = True
