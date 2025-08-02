@@ -14,6 +14,7 @@ import json
 from rest_framework_simplejwt.tokens import RefreshToken,TokenError
 def generate_otp():
     return str(random.randint(100000,999999))
+@method_decorator(csrf_exempt, name='dispatch')
 class SignAPIView(APIView):
     def post(self, request):
         try:
@@ -119,6 +120,7 @@ class OTPVerificationAPIview(APIView):
         user.save()
 
         return Response({'message': 'OTP verified successfully, user is now active'}, status=200)
+@method_decorator(csrf_exempt, name='dispatch')
 class SigninAPIView(APIView):
     def post(self, request):
         email = request.data.get('email')
@@ -172,17 +174,28 @@ class SigninAPIView(APIView):
 
 
 class LogoutAPIView(APIView):
-    permission_classes=[IsAuthenticated]
-    def post(self,request):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
         try:
-            refresh_token=request.data.get('refresh_token')
+            # ✅ Get refresh token from cookie
+            refresh_token = request.COOKIES.get('refresh')
             if not refresh_token:
-                return Response({"error":"rfresh token is required"},status=status.HTTP_400_BAD_REQUEST)
-            token=RefreshToken(refresh_token)
+                return Response({"error": "Refresh token not found in cookies"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # ✅ Blacklist the token
+            token = RefreshToken(refresh_token)
             token.blacklist()
-            return Response({"error":"Logout Successfull"},status=status.HTTP_205_RESET_CONTENT)
+
+            # ✅ Clear cookies on client side
+            response = Response({"message": "Logout successful"}, status=status.HTTP_205_RESET_CONTENT)
+            response.delete_cookie('access', domain='.ratanjyoti.in')
+            response.delete_cookie('refresh', domain='.ratanjyoti.in')
+            return response
+
         except TokenError:
-            return Response({"error":"Invalid or Expired token"},status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Invalid or expired token"}, status=status.HTTP_400_BAD_REQUEST)
+@method_decorator(csrf_exempt, name='dispatch')
 class RefreshTokenAPIView(APIView):
     def post(self, request):
         # ✅ Get refresh token from cookie
@@ -210,7 +223,7 @@ class RefreshTokenAPIView(APIView):
 
         except TokenError:
             return Response({"error": "Invalid or expired token"}, status=status.HTTP_401_UNAUTHORIZED)
-
+@method_decorator(csrf_exempt, name='dispatch')
 class ForgetPasswordAPIView(APIView):
     def post(self,request):
         email=request.data.get('email')
@@ -230,6 +243,7 @@ class ForgetPasswordAPIView(APIView):
             fail_silently=True,
         )
         return Response({'message':'OTP sent to your email'},status=status.HTTP_200_OK)
+@method_decorator(csrf_exempt, name='dispatch')
 class ResetPasswordWithOTPView(APIView):
     def post(self, request):
         email = request.data.get('email')
