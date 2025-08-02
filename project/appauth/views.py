@@ -121,45 +121,50 @@ class OTPVerificationAPIview(APIView):
         return Response({'message': 'OTP verified successfully, user is now active'}, status=200)
 class SigninAPIView(APIView):
     def post(self, request):
-        data = request.data
-        email = data.get('email')
-        password = data.get('password')
+        email = request.data.get('email')
+        password = request.data.get('password')
 
         if not email or not password:
-            return Response({'error': 'Email and Password are required'})
+            return Response({'error': 'Email and password are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
         user = authenticate(request, email=email, password=password)
-        if user is not None:
-            if user.is_verified or user.is_superuser:
-                refresh = RefreshToken.for_user(user)
 
-                response = Response({
-                    'is_superuser': user.is_superuser,
-                    'message': "Login successful",
-                }, status=201)
+        if user is None:
+            return Response({'error': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-                # Set HttpOnly cookies
-                response.set_cookie(
-                    key='access',
-                    value=str(refresh.access_token),
-                    httponly=True,
-                    secure=True,      # Make False only during localhost testing
-                    samesite='Lax',
-                    max_age=300
-                )
-                response.set_cookie(
-                    key='refresh',
-                    value=str(refresh),
-                    httponly=True,
-                    secure=True,
-                    samesite='Lax',
-                    max_age=86400
-                )
-                return response
-            else:
-                return Response({'error': 'Account not verified. Please verify your email.'}, status=403)
-        else:
-            return Response({'error': 'Invalid Credentials.'}, status=401)
+        if not user.is_verified and not user.is_superuser:
+            return Response({'error': 'Account not verified. Please verify your email.'}, status=status.HTTP_403_FORBIDDEN)
+
+        refresh = RefreshToken.for_user(user)
+        access_token = str(refresh.access_token)
+
+        response = Response({
+            'message': 'Login successful',
+            'is_superuser': user.is_superuser,
+        }, status=status.HTTP_200_OK)
+
+        # Set HttpOnly cookies
+        cookie_secure = not settings.DEBUG  # Automatically True in production, False during local dev
+
+        response.set_cookie(
+            key='access',
+            value=access_token,
+            httponly=True,
+            secure=cookie_secure,
+            samesite='Lax',
+            max_age=300  # 5 minutes
+        )
+        response.set_cookie(
+            key='refresh',
+            value=str(refresh),
+            httponly=True,
+            secure=cookie_secure,
+            samesite='Lax',
+            max_age=7 * 24 * 60 * 60  # 7 days
+        )
+
+        return response
+
 
 class LogoutAPIView(APIView):
     permission_classes=[IsAuthenticated]
