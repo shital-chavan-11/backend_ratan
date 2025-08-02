@@ -1,5 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from django.core.mail import send_mail
 from django.conf import settings
@@ -8,7 +9,9 @@ import random
 from django.contrib.auth import authenticate
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from rest_framework_simplejwt.tokens import RefreshToken
+from django.http import JsonResponse
+import json
+from rest_framework_simplejwt.tokens import RefreshToken,TokenError
 def generate_otp():
     return str(random.randint(100000,999999))
 class SignAPIView(APIView):
@@ -117,23 +120,209 @@ class OTPVerificationAPIview(APIView):
 
         return Response({'message': 'OTP verified successfully, user is now active'}, status=200)
 class SigninAPIView(APIView):
-    def post(self,request):
-        data=request.data
-        email=data.get('email')
-        password=data.get('password')
+    def post(self, request):
+        data = request.data
+        email = data.get('email')
+        password = data.get('password')
+
         if not email or not password:
-            return Response({'error':'Email and Password are required'})
-        user=authenticate(request,email=email,password=password)
+            return Response({'error': 'Email and Password are required'})
+
+        user = authenticate(request, email=email, password=password)
         if user is not None:
             if user.is_verified or user.is_superuser:
-                refresh=RefreshToken.for_user(user)
-                return Response({
-                    'access':str(refresh.access_token),
-                    'refresh':str(refresh),
-                    'is_superuser':user.is_superuser,
-                    'message':"Login successfull",
-                },status=201)
+                refresh = RefreshToken.for_user(user)
+
+                response = Response({
+                    'is_superuser': user.is_superuser,
+                    'message': "Login successful",
+                }, status=201)
+
+                # Set HttpOnly cookies
+                response.set_cookie(
+                    key='access',
+                    value=str(refresh.access_token),
+                    httponly=True,
+                    secure=True,      # Make False only during localhost testing
+                    samesite='Lax',
+                    max_age=300
+                )
+                response.set_cookie(
+                    key='refresh',
+                    value=str(refresh),
+                    httponly=True,
+                    secure=True,
+                    samesite='Lax',
+                    max_age=86400
+                )
+                return response
             else:
-                return Response({'error':'Account not verified.Please verify your email.'},status=403)
+                return Response({'error': 'Account not verified. Please verify your email.'}, status=403)
         else:
-            return Response({'error':'Invalid Credentials.'},status=401)
+            return Response({'error': 'Invalid Credentials.'}, status=401)
+
+class LogoutAPIView(APIView):
+    permission_classes=[IsAuthenticated]
+    def post(self,request):
+        try:
+            refresh_token=request.data.get('refresh_token')
+            if not refresh_token:
+                return Response({"error":"rfresh token is required"},status=status.HTTP_400_BAD_REQUEST)
+            token=RefreshToken(refresh_token)
+            token.blacklist()
+            return Response({"error":"Logout Successfull"},status=status.HTTP_205_RESET_CONTENT)
+        except TokenError:
+            return Response({"error":"Invalid or Expired token"},status=status.HTTP_400_BAD_REQUEST)
+class RefreshTokenAPIView(APIView):
+    def post(self, request):
+        refresh_token = request.data.get('refresh_token')
+
+        if not refresh_token:
+            return Response({"error": "Refresh Token must be provided"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            refresh = RefreshToken(refresh_token)
+            access_token = str(refresh.access_token)
+
+            # Create a response object
+            response = Response({"message": "Access token refreshed"}, status=status.HTTP_200_OK)
+
+            # Set new access token as HttpOnly cookie
+            response.set_cookie(
+                key='access',
+                value=access_token,
+                httponly=True,
+                secure=True,       # True in production (HTTPS)
+                samesite='Lax',
+                max_age=300         # 5 minutes
+            )
+
+            return response
+
+        except TokenError:
+            return Response({"error": "Invalid or Expired Token"}, status=status.HTTP_401_UNAUTHORIZED)
+class ForgetPasswordAPIView(APIView):
+    def post(self,request):
+        email=request.data.get('email')
+        if not email:
+            return Response({"error":"Email is Required"},status=status.HTTP_400_BAD_REQUEST)
+        try:
+            user=CustomUser.objects.get(email=email)
+        except CustomUser.DoesNotExist:
+            return Response({"error":"User not Found"})
+        otp=generate_otp()
+        OTPRecord.objects.create(user=user,otp=otp)
+        send_mail(
+            subject='Your OTP for Password Reset',
+            message=f'Your OTP is:{otp}',
+            from_email='noreply@gmail.com',
+            recipient_list=[email],
+            fail_silently=True,
+        )
+        return Response({'message':'OTP sent to your email'},status=status.HTTP_200_OK)
+class ResetPasswordWithOTPView(APIView):
+    def post(self, request):
+        email = request.data.get('email')
+        otp = request.data.get('otp')
+        new_password = request.data.get('new_password')
+
+        if not all([email, otp, new_password]):
+            return Response({'error': 'Email, OTP, and new password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = CustomUser.objects.get(email=email)
+        except CustomUser.DoesNotExist:
+            return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            otp_record = OTPRecord.objects.filter(user=user, otp=otp, is_used=False).latest('created_at')
+        except OTPRecord.DoesNotExist:
+            return Response({'error': 'Invalid or expired OTP.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not otp_record.is_valid():
+            return Response({'error': 'OTP expired or already used.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ✅ Update password
+        user.set_password(new_password)
+        user.save()
+
+        # ✅ Mark OTP as used
+        otp_record.is_used = True
+        otp_record.save()
+
+        return Response({'message': 'Password reset successfully.'}, status=status.HTTP_200_OK)
+@method_decorator(csrf_exempt, name='dispatch')
+class EditProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        user = request.user
+        return JsonResponse({
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'birth_date': user.birth_date,
+            'email': user.email,
+            'mobile': user.mobile,
+        })
+
+    def patch(self, request):
+        try:
+            data = json.loads(request.body)
+            user = request.user
+
+            if 'email' in data and data['email'] != user.email:
+                return JsonResponse({'error': 'Email cannot be changed.'}, status=400)
+
+            user.first_name = data.get('first_name', user.first_name).strip()
+            user.last_name = data.get('last_name', user.last_name).strip()
+            user.birth_date = data.get('birth_date', user.birth_date)
+            user.mobile = data.get('mobile', user.mobile).strip()
+
+            user.save()
+
+            return JsonResponse({
+                'message': 'Profile updated successfully.',
+                'user': {
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'birth_date': user.birth_date,
+                    'email': user.email,
+                    'mobile': user.mobile,
+                }
+            }, status=200)
+
+        except Exception as e:
+            return JsonResponse({'error': f'Server error: {str(e)}'}, status=500)
+class ResendOTPAPIView(APIView):
+    authentication_classes = []  # Optional: No auth required
+    permission_classes = []      # Optional: No permission required
+
+    def post(self, request):
+        email = request.data.get('email')
+
+        if not email:
+            return Response({'error': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = CustomUser.objects.get(email=email)
+        except CustomUser.DoesNotExist:
+            return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if user.is_active and user.is_verified:
+            return Response({'error': 'User is already verified.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Invalidate previous OTPs
+        OTPRecord.objects.filter(user=user, is_used=False).update(is_used=True)
+
+        # Generate and save new OTP
+        new_otp = generate_otp()
+        OTPRecord.objects.create(user=user, otp=new_otp)
+
+        # Send email
+        send_mail(
+            subject="Your New OTP - Verify Your Email",
+            message=f"Your new OTP is: {new_otp}. It is valid for 10 minutes.",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+        )
+
+        return Response({'message': 'New OTP sent successfully.'}, status=status.HTTP_200_OK)
